@@ -558,6 +558,8 @@ var (
 	flagTraceHTTP int         = 1
 	folderPatern  string      // File name pattern
 	filePERM      os.FileMode = 0777
+	fileUserGroup string      = ""
+
 	//flagTraceHTTP     = flag.Int("http-trace", 0, "trace level for http, from 0: no trace (default)) to 2:detailed trace")
 	printerURL   = flag.String("printer", "", "Printer URL like http://1.2.3.4:8080, when omitted, the device is searched on the network")
 	computerName = flag.String("name", hostname(), "Name of the computer visible on the printer (default: $hostname)")
@@ -569,6 +571,7 @@ func init() {
 	flag.StringVar(&folderPatern, "d", "", "shorthand for -destination")
 	//flag.Int64Var(&optionFilePERM, "permission", 0777, "file permission, default 0777")
 
+	flag.StringVar(&fileUserGroup, "owner", "", "userid:groupid (ex: 1000:1000)")
 	//*modeTrace = true
 }
 
@@ -596,6 +599,7 @@ func main() {
 	if *computerName == "" {
 		*computerName, _ = os.Hostname()
 	}
+	CheckIDs(fileUserGroup)
 
 	if folderPatern == "" {
 		WARNING.Println("No destination given, assuming: -destination = ./%Y%m%d-%H%M%S")
