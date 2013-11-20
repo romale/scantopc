@@ -5,7 +5,6 @@ package main
 
 import (
 	"bytes"
-	"code.google.com/p/gofpdf"
 	"encoding/xml"
 	"errors"
 	"flag"
@@ -19,6 +18,8 @@ import (
 	"strings"
 	"time"
 )
+
+const VERSION = "0.1.1"
 
 func CheckError(context string, err error) {
 	if err != nil {
@@ -127,8 +128,8 @@ func registerScanToComp(d *deviceInfo) (client *clientInfo, err error) {
 		}
 		{
 			Me := &HPPostDestination{
-				Name:     *computerName + "-A",
-				Hostname: *computerName + "-B",
+				Name:     *computerName,
+				Hostname: *computerName,
 				LinkType: "Network",
 			}
 
@@ -204,20 +205,27 @@ func pullDeviceEvents(c *clientInfo) {
 	}
 }
 
+var lastScanEventAgingStamp = ""
+
 func doHandleEvent(clientInfo *clientInfo, event *HPEvent) error {
 	switch event.UnqualifiedEventCategory {
 	case "ScanEvent":
 		uri := ""
-		for _, payload := range event.Payloads {
-			if payload.ResourceType == "wus:WalkupScanToCompDestination" {
-				uri = payload.ResourceURI
+		if event.AgingStamp != lastScanEventAgingStamp {
+			for _, payload := range event.Payloads {
+				if payload.ResourceType == "wus:WalkupScanToCompDestination" {
+					uri = payload.ResourceURI
+				}
 			}
-		}
-		if clientInfo.uuid == getUUIDfromURI(uri) {
-			TRACE.Println("Event ScanEvent accepted")
-			doGetWalkupScanToCompEvent(clientInfo)
+			if clientInfo.uuid == getUUIDfromURI(uri) {
+				TRACE.Println("Event ScanEvent accepted")
+				doGetWalkupScanToCompEvent(clientInfo)
+				lastScanEventAgingStamp = event.AgingStamp
+			} else {
+				TRACE.Println("Event ScanEvent ignored, uri doesn't match")
+			}
 		} else {
-			TRACE.Println("Event ScanEvent ignored, uri doesn't match")
+			TRACE.Println("Event ScanEvent ignored, AgingStamp already processed")
 		}
 		return nil
 	case "PoweringDownEvent":
@@ -539,25 +547,6 @@ func doUploadImage(uri string, scanJob *ScanJob, HPJob *HPJob) {
 	}
 }
 
-func doSaveAsPDF(ScanJob *ScanJob) {
-	pdfFile := ScanJob.FileName + ".pdf"
-	out, err := os.Create(pdfFile)
-	CheckError("Create "+pdfFile, err)
-	defer out.Close()
-	TRACE.Println("doSaveAsPDF", pdfFile)
-	pdf := gofpdf.New("P", "mm", "A4", "")
-	for _, page := range ScanJob.pages {
-		TRACE.Println("\tAdd image", page)
-		pdf.AddPage()
-		pdf.Image(page, 0, 0, 210, 297, false, "", 0, "")
-	}
-	pdf.OutputAndClose(out)
-	for _, page := range ScanJob.pages {
-		os.Remove(page)
-	}
-	INFO.Println("Document saved", pdfFile)
-}
-
 ////////////////////////////////////////////////////////////////////////////////*
 
 func hostname() string {
@@ -580,7 +569,6 @@ func init() {
 	flag.StringVar(&folderPatern, "d", "", "shorthand for -destination")
 	//flag.Int64Var(&optionFilePERM, "permission", 0777, "file permission, default 0777")
 
-	//folderPatern = "/home/jeanf/ownCloud/Scans/%Y/%Y-%m/%Y%m%d-%H%M%S"
 	//*modeTrace = true
 }
 
@@ -610,8 +598,10 @@ func main() {
 	}
 
 	if folderPatern == "" {
-		ERROR.Println("Parameter -destination can't be empty")
-		usage()
+		WARNING.Println("No destination given, assuming: -destination = ./%Y%m%d-%H%M%S")
+		folderPatern = "./%Y%m%d-%H%M%S"
+		//ERROR.Println("Parameter -destination can't be empty")
+		//usage()
 	} else {
 		// Test the pattern to detect issues immediatly
 		s, err := ExpandString(folderPatern, time.Now())
@@ -622,7 +612,7 @@ func main() {
 		TRACE.Println("Save to ", s)
 	}
 
-	INFO.Println(os.Args[0], "started")
+	INFO.Println(os.Args[0], "version", VERSION, "started")
 	SearchPrinter()
 	INFO.Println(os.Args[0], "stopped")
 

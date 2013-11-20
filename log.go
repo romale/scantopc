@@ -24,7 +24,7 @@ func logInit(
 		log.Ldate|log.Ltime|log.Lshortfile)
 
 	INFO = log.New(infoHandle,
-		"INFO: ",
+		"",
 		log.Ldate|log.Ltime)
 
 	WARNING = log.New(warningHandle,
