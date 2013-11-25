@@ -13,6 +13,7 @@ import (
 )
 
 func CopyAndFixJPEG(w io.Writer, r io.Reader, ActualLineNumber int) (written int64, err error) {
+	defer Un(Trace("CopyAndFixJPEG", ActualLineNumber))
 	i := 0
 	buf := make([]byte, 256)
 	l, err := r.Read(buf)

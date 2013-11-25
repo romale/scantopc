@@ -3,63 +3,65 @@ package main
 
 import (
 	"code.google.com/p/gofpdf"
+	"fmt"
+	"io"
 	"os"
 	"path"
-	//"strconv"
-	//"strings"
 )
-
-var uID, gID int = 0, 0
 
 func CheckFolder(filename string) error {
 	dir, _ := path.Split(filename)
 	if dir != "" {
 		err := os.MkdirAll(dir, filePERM)
-		//if fileUserGroup != "" {
-		//	err = os.Chown(filename, uID, gID)
-		//}
 		return err
 	}
 	return nil
 }
 
-func CheckIDs(fileUserGroup string) {
-	//if fileUserGroup != "" {
-	//	s := strings.Split(fileUserGroup, ":")
-	//	if len(s) == 2 {
-	//		var err error
-	//		if uID, err = strconv.Atoi(s[0]); err != nil {
-	//			ERROR.Fatalln("UserID must be numerical")
-	//		}
-	//		if gID, err = strconv.Atoi(s[0]); err != nil {
-	//			ERROR.Fatalln("GroupID must be numerical")
-	//		}
-	//	} else {
-	//		ERROR.Fatalln("User ID and Group ID should be provided like following: uid:gid")
-	//	}
-	//} else {
-	//	uID = os.Getuid()
-	//	gID = os.Getgid()
-	//}
+func SaveAsPDFSimplex(Job *Job) {
+	Un(Trace("SaveAsPDFSimplex", Job))
 
-}
-
-func doSaveAsPDF(ScanJob *ScanJob) {
-	pdfFile := ScanJob.FileName + ".pdf"
+	pdfFile := Job.Path() + ".pdf"
+	CheckFolder(pdfFile)
 	out, err := os.Create(pdfFile)
 	CheckError("Create "+pdfFile, err)
 	defer out.Close()
-	TRACE.Println("doSaveAsPDF", pdfFile)
+	TRACE.Println("SaveAsPDF", pdfFile)
 	pdf := gofpdf.New("P", "mm", "A4", "")
-	for _, page := range ScanJob.pages {
+	for _, page := range Job.ImageList {
 		TRACE.Println("\tAdd image", page)
 		pdf.AddPage()
 		pdf.Image(page, 0, 0, 210, 297, false, "", 0, "")
 	}
 	pdf.OutputAndClose(out)
-	for _, page := range ScanJob.pages {
-		os.Remove(page)
-	}
-	//err = os.Chown(pdfFile, uID, gID)
 	INFO.Println("Document saved", pdfFile)
+}
+
+func SaveAsJPEG(Job *Job) {
+	Un(Trace("SaveAsJPEG", Job))
+	fileStub := Job.Path()
+	CheckFolder(fileStub + ".jpg")
+	for i, page := range Job.ImageList {
+		name := fmt.Sprintf("%s-%04d.jpeg", fileStub, i)
+		_, err := CopyFile(page, name)
+		CheckError("CopyFile", err)
+	}
+	INFO.Println("Image(s) saved")
+}
+
+func CopyFile(src, dst string) (int64, error) {
+	Un(Trace("CopyFile", src, dst))
+	sf, err := os.Open(src)
+	defer sf.Close()
+	if err != nil {
+		CheckError(src, err)
+		return 0, err
+	}
+	df, err := os.Create(dst)
+	defer df.Close()
+	if err != nil {
+		CheckError(dst, err)
+		return 0, err
+	}
+	return io.Copy(df, sf)
 }

@@ -115,8 +115,9 @@ type HPScanCap struct {
 	ModelName        string         `xml:"DeviceCaps>ModelName"`
 	DerivativeNumber int            `xml:"DeviceCaps>DerivativeNumber"`
 	ColorEntries     []HPColorEntry `xml:"ColorEntries>ColorEntry"`
-	Platen           HPScanSource   `xml:"Platen"`
-	Adf              HPScanSource   `xml:"Adf"`
+	//TODO: Change following fields by a map
+	Platen HPScanSource `xml:"Platen"`
+	Adf    HPScanSource `xml:"Adf"`
 }
 
 type HPColorEntry struct {
