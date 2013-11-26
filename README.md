@@ -1,7 +1,6 @@
 scantopc
 ==========
 
-***
 
 This program provides the "ScanToComputer" functionality given by HP for they multi-functions printers for windows users.
 
@@ -48,17 +47,20 @@ This litle piece of code is my first programming experience with Go language and
 # TODO: 
 - Fix Qnap problem
 - Manage several MFP on the network.
-- Permit "soft" duplex scanning 
 - better error management
 
 # CHANGE LOG
 
+* 0.2.1
+	Fix: Error when image takes to long
+	Fix: Turn off TRACE mode by default 
 * 0.2
 	- Code reorganisation
 	- Multi settings: creation of several "destinations", each destination uses different settings:
 		HOSTNAME (Normal) : Same settings as before
 		HOSTNAME (LowRes) : 75DPI scanning 
 	- Fix: uncontroled go routine number
+	- Soft double side scanning whin sigle side ADF
 * 0.1
 	- Fix endless scanning when using flat bed
 
