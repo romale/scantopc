@@ -179,9 +179,47 @@ JobLoop:
 	return
 }
 
+type MyTicker struct {
+	actif bool
+	job   *Job
+	d     time.Duration
+}
+
+func NewMyTicker(d time.Duration, job *Job) *MyTicker {
+	defer Un(Trace("NewMyTicker"))
+	mt := &MyTicker{true, job, d}
+	go mt.Run()
+	return mt
+}
+
+func (mt *MyTicker) Run() {
+	defer Un(Trace("MyTicker.Run"))
+	t := time.NewTicker(mt.d)
+
+	for _ = range t.C {
+		if !mt.actif {
+			break
+		}
+		mt.job.Device.DocumentProcessor.SendEvent(EventProcessingJob, mt.job)
+	}
+}
+
+func (mt *MyTicker) Stop() {
+	defer Un(Trace("MyTicker.Stop"))
+	mt.actif = false
+}
+
+func (j *Job) KeepAlive() {
+	defer Un(Trace("Job.KeepAlive"))
+	j.Device.DocumentProcessor.SendEvent(EventProcessingJob, j)
+
+}
+
 // Download image form the scanner, fix JPEG structure and save it into a file
 func (j *Job) DownloadImage(HPJob *HPJob) {
 	defer Un(Trace("Job.DownloadImage"))
+	KeepAlive := NewMyTicker(10*time.Second, j)
+	defer KeepAlive.Stop()
 
 	imageFile := j.TempDir + "/" + fmt.Sprintf("page-%04d.jpg", j.ImageNumber)
 	out, err := os.Create(imageFile)
@@ -203,6 +241,7 @@ func (j *Job) DownloadImage(HPJob *HPJob) {
 	} else {
 		ERROR.Println("Get", uri, "failed!", resp.Status, err)
 	}
+	KeepAlive.Stop()
 
 }
 
