@@ -3,11 +3,11 @@ package main
 type DestinationSettings struct {
 	Name           string
 	FilePattern    *string
-	SourceDocument map[string]map[string]ScanSettings // Per Source/Format
+	SourceDocument map[string]map[string]ScanSettings // Per Source, per Format
 }
 
 type ScanSettings struct {
-	Resolution      int    // 75,100,200,300,600,1200
+	Resolution      int    // 75,100,200,300,600,1200 dpi
 	ColorSpace      string // Color,Gray
 	Compression     int    // 15
 	BitDepth        int    // 8
@@ -31,7 +31,7 @@ var DefaultDestinationSettings = MapOfDestinationSettings{
 		Name:        "Normal",
 		FilePattern: &paramFolderPatern,
 		SourceDocument: map[string]map[string]ScanSettings{
-			"Platten": map[string]ScanSettings{
+			"Platen": map[string]ScanSettings{
 				"JPEG": ScanSettings{
 					Resolution:      200,
 					ColorSpace:      "Color",
@@ -83,7 +83,7 @@ var DefaultDestinationSettings = MapOfDestinationSettings{
 					ContentType:     "Photo",
 				},
 				"PDF": ScanSettings{
-					Resolution:      300,
+					Resolution:      200,
 					ColorSpace:      "Gray",
 					Compression:     15,
 					BitDepth:        8,
@@ -105,7 +105,7 @@ var DefaultDestinationSettings = MapOfDestinationSettings{
 		Name:        "LowRes",
 		FilePattern: &paramFolderPatern,
 		SourceDocument: map[string]map[string]ScanSettings{
-			"Platten": map[string]ScanSettings{
+			"Platen": map[string]ScanSettings{
 				"JPEG": ScanSettings{
 					Resolution:      75,
 					ColorSpace:      "Color",

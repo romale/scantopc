@@ -2,6 +2,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"runtime"
@@ -13,6 +14,8 @@ var (
 	INFO    *log.Logger
 	WARNING *log.Logger
 	ERROR   *log.Logger
+
+	traceGoRoutines bool = false
 )
 
 func logInit(
@@ -44,20 +47,28 @@ func logInit(
 }
 
 func Trace(f string, v ...interface{}) string {
-	TRACE.Println("GO Routines", runtime.NumGoroutine())
-	TRACE.Println("Entering:", f, v)
+	if traceGoRoutines {
+		TRACE.Println("GO Routines", runtime.NumGoroutine())
+	}
+	TRACE.Output(3, fmt.Sprint("Entering ", f, v, "\n"))
+	//TRACE.Println("Entering:", f, v)
 	return f
 }
 
 func Un(f string) {
-	TRACE.Println("Leaving:", f)
-	TRACE.Println("GO Routines", runtime.NumGoroutine())
+	//	TRACE.Println("Leaving:", f)
+	TRACE.Output(3, fmt.Sprintf("Leaving %v\n", f))
+	if traceGoRoutines {
+		TRACE.Println("GO Routines", runtime.NumGoroutine())
+	}
 }
 
 func TraceGoRoutine() {
-	ticker := time.NewTicker(10 * time.Second)
-	for _ = range ticker.C {
-		TRACE.Println("GO Routines:", runtime.NumGoroutine())
+	if traceGoRoutines {
+		ticker := time.NewTicker(10 * time.Second)
+		for _ = range ticker.C {
+			TRACE.Println("GO Routines:", runtime.NumGoroutine())
+		}
+		ticker.Stop()
 	}
-	ticker.Stop()
 }

@@ -22,6 +22,7 @@ type Device struct {
 	Connected               bool
 	HPScanStatus            HPScanStatus
 	Job                     *Job
+	DocumentProcessor       *StateMachine
 }
 
 type Destination struct {
@@ -36,6 +37,7 @@ func NewDevice(name, url string, settings MapOfDestinationSettings) *Device {
 	d.URL = url
 	d.Destinations = make(map[string]*Destination)
 	d.Register(settings)
+	d.DocumentProcessor = NewStateMaching(name)
 	return d
 }
 
@@ -238,23 +240,26 @@ func (d *Device) ScanEvent(Destination *Destination, uri string) {
 		case "HostSelected":
 			// That's for us...
 			// Nothing to do... We'R ready
+			_ = d.GetWalkupScanToCompDestinations(uri)
+			source := d.GetSource()
+			d.Job = NewJob(d, Destination, source)
+			d.DocumentProcessor.SendEvent(EventStartJob, d.Job)
 
 		case "ScanRequested":
-			// 	ScanRequested : Start Adf scanning or 1st page on Platten scanning
+			// 	ScanRequested : Start Adf scanning or 1st page on Platen scanning
 			dest := d.GetWalkupScanToCompDestinations(uri)
-			source := d.GetSource()
-			d.Job = NewJob(d, Destination, source, dest.WalkupScanToCompSettings.Shortcut)
-			d.Job.Scan()
+			d.Job.Scan(dest.WalkupScanToCompSettings.Shortcut)
+			d.DocumentProcessor.SendEvent(EventProcessingJob, d.Job)
 
 		case "ScanNewPageRequested":
 			//	ScanNewPageRequested: Subsequent pages on Platten
-			_ = d.GetWalkupScanToCompDestinations(uri)
-			d.Job.Scan()
+			dest := d.GetWalkupScanToCompDestinations(uri)
+			d.Job.Scan(dest.WalkupScanToCompSettings.Shortcut)
+			d.DocumentProcessor.SendEvent(EventProcessingJob, d.Job)
 
 		case "ScanPagesComplete":
 			if d.Job != nil {
-				d.Job.SaveImage()
-				d.Job.Finalize()
+				d.DocumentProcessor.SendEvent(EventEndJob, d.Job)
 				d.Job = nil
 			}
 		}

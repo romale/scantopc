@@ -19,21 +19,20 @@ type Job struct {
 	ImageList    []string     // List of scanned images
 	ImageNumber  int          //
 	//	HPJob              *HPJob          // Structure of HP Job
-	HPScanCap          *HPScanCap      // Scanner capabilities
-	HPScanSettings     *HPScanSettings // Settings for the scan job
-	Now                time.Time       // Job time for generating file name
-	FilePath, FileName string          // Final path and image name(s)
+	HPScanCap      *HPScanCap      // Scanner capabilities
+	HPScanSettings *HPScanSettings // Settings for the scan job
+	Now            time.Time       // Job time for generating file name
+	//	FilePath, FileName string          // Final path and image name(s)
 }
 
 // Creates job structure, call Scanner Cap and determine Settings for ScanJob
-func NewJob(Device *Device, Destination *Destination, Source string, DocumentType string) *Job {
-	defer Un(Trace("NewJob", Source, DocumentType))
+func NewJob(Device *Device, Destination *Destination, Source string) *Job {
+	defer Un(Trace("NewJob", Source, Destination.DestinationSettings.Name))
 	j := new(Job)
 
 	j.Device = Device
 	j.Destination = Destination
 	j.Source = Source
-	j.DocumentType = DocumentType[4:]
 	j.Now = time.Now()
 	//TODO: Make this OS independant
 	t, err := ioutil.TempDir("", "scantopc")
@@ -41,7 +40,6 @@ func NewJob(Device *Device, Destination *Destination, Source string, DocumentTyp
 	j.TempDir = t
 
 	j.GetScanCap()
-	j.CheckScanJobSettings()
 	TRACE.Printf("New Job: %+v\n", j)
 	return j
 }
@@ -84,6 +82,8 @@ func (j *Job) CheckScanJobSettings() {
 		}
 	}
 
+	TRACE.Printf("Source %s, Format %s,\nSettings %+v\n", j.Source, j.DocumentType, j.Destination.DestinationSettings.SourceDocument[j.Source])
+
 	// Create Setting structure for the ScanJob.
 	j.HPScanSettings = &HPScanSettings{
 		XResolution:        HPResolution.XResolution,
@@ -108,12 +108,15 @@ func (j *Job) CheckScanJobSettings() {
 		NoiseRemoval:       j.Destination.DestinationSettings.SourceDocument[j.Source][j.DocumentType].NoiseRemoval,
 		ContentType:        j.Destination.DestinationSettings.SourceDocument[j.Source][j.DocumentType].ContentType,
 	}
-
+	TRACE.Printf("%+v\n", j.HPScanSettings)
 }
 
 // Post scan job and handle it
-func (j *Job) Scan() {
-	defer Un(Trace("Job.Scan"))
+func (j *Job) Scan(DocumentType string) {
+	defer Un(Trace("Job.Scan", DocumentType))
+
+	j.DocumentType = DocumentType[4:]
+	j.CheckScanJobSettings()
 
 	ByteArray, err := xml.MarshalIndent(j.HPScanSettings, "", "  ")
 	r := bytes.NewBufferString(XMLHeader + string(ByteArray))
@@ -133,6 +136,7 @@ func (j *Job) Scan() {
 	// Call JobUrl until JobState is Completed or Canceled
 JobLoop:
 	for _ = range ticker.C {
+		j.Device.DocumentProcessor.SendEvent(EventProcessingJob, j)
 		resp, err := httpGet(jobURL)
 		defer resp.Body.Close()
 		if err == nil && resp.StatusCode == 200 {
@@ -202,16 +206,6 @@ func (j *Job) DownloadImage(HPJob *HPJob) {
 
 }
 
-func (j *Job) SaveImage() {
-	defer Un(Trace("Job.SaveImage"))
-	switch j.DocumentType {
-	case "PDF":
-		SaveAsPDFSimplex(j)
-	case "JPEG":
-		SaveAsJPEG(j)
-	}
-}
-
 func (j *Job) Path() string {
 	defer Un(Trace("Job.Path"))
 	p, err := ExpandString(paramFolderPatern, j.Now)
@@ -222,4 +216,8 @@ func (j *Job) Path() string {
 func (j *Job) Finalize() {
 	defer Un(Trace("Job.Finalize"))
 	os.RemoveAll(j.TempDir)
+}
+
+func (j *Job) PageNumber() int {
+	return len(j.ImageList)
 }

@@ -83,6 +83,7 @@ var (
 	paramComputerName string
 	paramPrinterURL   string
 	paramFolderPatern string
+	paramDoubleSide   bool
 )
 
 func init() {
@@ -91,7 +92,8 @@ func init() {
 	flag.StringVar(&paramPrinterURL, "printer", "", "Printer URL like http://1.2.3.4:8080, when omitted, the device is searched on the network")
 	flag.StringVar(&paramFolderPatern, "destination", "", "Folder where images are strored (see help for tokens)")
 	flag.StringVar(&paramFolderPatern, "d", "", "shorthand for -destination")
-
+	flag.BoolVar(&paramDoubleSide, "D", true, "shorthand for -doubleside")
+	flag.BoolVar(&paramDoubleSide, "doubleside", true, "enable double side scanning with one side scannig")
 	paramModeTrace = true
 
 }
@@ -148,6 +150,7 @@ func main() {
 */
 func MainLoop() {
 	defer Un(Trace("MainLoop"))
+
 	for {
 		printer := paramPrinterURL
 		if printer == "" {
