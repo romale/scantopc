@@ -20,6 +20,7 @@ func TokensUsage() {
 	%M  Minute (2 digits):    54
 	%S  Second (2 digits):    20
 	%p  AM / PM:              PM
+	%e	Extension			  jpg or pdf
 	`)
 }
 
@@ -33,7 +34,7 @@ func ExpandString(layout string, t time.Time) (value string, err error) {
 			value += string(c)
 		} else {
 			if i == len(layout) {
-				err = errors.New("% can't be the last layout character")
+				err = errors.New("% can't be the last layout's character")
 				break
 			}
 			c = layout[i]

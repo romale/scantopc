@@ -6,60 +6,20 @@ package main
 import (
 	"flag"
 	"fmt"
+	//	"github.com/simulot/scantopc/sm"
 	"github.com/simulot/srvloc"
-	"io"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 )
 
-const VERSION = "0.2.0 DEV"
+const VERSION = "0.3.0 DEV"
 
 func CheckError(context string, err error) {
 	if err != nil {
 		ERROR.Panicln("panic", context, "->", err)
 	}
-}
-
-func httpGet(url string) (resp *http.Response, err error) {
-	resp, err = http.Get(url)
-	if flagTraceHTTP > 0 {
-		if err != nil {
-			ERROR.Panicln("http.Get(", url, ") ->", err)
-			return nil, err
-		} else {
-			TRACE.Println("http.Get(", url, ") ->", resp.Status, err)
-			if flagTraceHTTP > 1 {
-				for h, v := range resp.Header {
-					TRACE.Println("\t", h, " --> ", v)
-				}
-			}
-		}
-	}
-	return
-}
-
-func httpPost(url string, bodyType string, body io.Reader) (resp *http.Response, err error) {
-	resp, err = http.Post(url, bodyType, body)
-	if flagTraceHTTP > 0 {
-		TRACE.Println("http.Post(", url, ",", bodyType, ") ->", resp.Status, err)
-		if flagTraceHTTP > 1 {
-			for h, v := range resp.Header {
-				TRACE.Println("\t", h, " --> ", v)
-			}
-		}
-	}
-	return
-}
-
-func ioutilReadAll(r io.Reader) (ByteArray []byte, err error) {
-	ByteArray, err = ioutil.ReadAll(r)
-	if flagTraceHTTP > 1 {
-		TRACE.Println("\tResponse:\n", string(ByteArray))
-	}
-	return
 }
 
 // Extract UUID placed at the right end of the URI
@@ -76,7 +36,7 @@ func hostname() string {
 }
 
 var (
-	flagTraceHTTP     int         = 1
+	flagTraceHTTP     int         = 0
 	filePERM          os.FileMode = 0777
 	fileUserGroup     string      = ""
 	paramModeTrace    bool
@@ -143,11 +103,7 @@ func main() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/*
-  Check each XX minutes if an HP printer appears on the network.
-  if the printer is detected, the print will be pulled for events.
 
-*/
 func MainLoop() {
 	defer Un(Trace("MainLoop"))
 
@@ -167,11 +123,10 @@ func MainLoop() {
 
 		if printer != "" {
 			INFO.Println("Connecting to", printer)
-			d := NewDevice("printer", printer, DefaultDestinationSettings)
-			d.DeviceEventLoop()
+			NewDeviceManager(printer, printer)
 		}
-		INFO.Println("Connection to ", printer, "lost. Sleeping...")
+		INFO.Println("Connection to ", printer, "lost.")
 		printer = ""
-		time.Sleep(time.Minute * 1)
+		time.Sleep(time.Second * 5)
 	}
 }
