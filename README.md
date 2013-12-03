@@ -1,14 +1,14 @@
 scantopc
 ==========
 
-
 This program provides the "ScanToComputer" functionality given by HP for they multi-functions printers for windows users.
 
-Place your document on the platten or in the automatic document feeder (Adf). Select Scan on printer display, then select a computer (a destination) and file format (PDF or JPEG).
+Place your document on the platen or in the automatic document feeder (Adf). Select Scan on printer display, then select a computer (a destination) and file format (PDF or JPEG).
 
 Double side scanning with single side ADF: 
-Place your original pile of document in the ADF, scan it. Flip them and scan it again.
-If the second batch starts before 2 minutes from the last one, both batches will be merged into a single document, with correct page order.
+Place your original pile of document in the ADF, scan it. This will produice a pdf file.
+Flip them and scan it again. This will produce a second pdf file. If the second one has same page number as previous one, both are merged into a document having same name as firts job, will "-doubleside" into the name.
+
 
 
 Tested with printer model Officejet 6700 on linux, freebsd.
@@ -39,10 +39,6 @@ This litle piece of code is my first programming experience with Go language and
 
 # Known problems
 - Fails on Qnap arm system; somthing is wrong with PDF generation.
-- Doesn't recover connection after  printer switch on/off
-- when using platen, the user MUST terminate scaning job properly on the printer. Otherwise, the job is never terminated
-
-
 
 # TODO: 
 - Fix Qnap problem
@@ -50,7 +46,15 @@ This litle piece of code is my first programming experience with Go language and
 - better error management
 
 # CHANGE LOG
-
+* 0.2.2
+	Fix: better error management 
+	Fix: better deconnection handling
+	Fix: reconnection error
+	Fix: PowerDown event handling
+	Code reorganisation: usage of event manager (again)
+	Change in double side handling: if the new scan job has same number of pages as previous one, both jobs are merged into one PDF
+	Changed Printer Event constant pulling by usage by using timout / etag.
+	 
 * 0.2.1
 	Fix: Error when image takes to long
 	Fix: Turn off TRACE mode by default 
@@ -62,5 +66,5 @@ This litle piece of code is my first programming experience with Go language and
 	- Fix: uncontroled go routine number
 	- Soft double side scanning whin sigle side ADF
 * 0.1
-	- Fix endless scanning when using flat bed
+	- Fix endless scanning when using flat bed (bad checking of AgingStamp)
 
