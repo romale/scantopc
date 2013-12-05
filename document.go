@@ -20,6 +20,7 @@ type Document struct {
 	ImageList []string // List of scanned images
 	Previous  *Document
 	timeout   *time.Timer
+	Clean     bool
 }
 
 func NewDocument(previous *Document) (*Document, error) {
@@ -76,32 +77,29 @@ func (d *Document) NewImageWritter() (io.WriteCloser, error) {
 	return out, err
 }
 
-func (d *Document) Save() error {
+func (d *Document) Save() (err error) {
 	defer Un(Trace("Document.Save"))
 
 	TRACE.Println("Document.Previous", d.Previous)
 
-	if d.Previous != nil {
+	if d.Previous != nil && d.Previous.Clean == false {
 		if d.FileType == "PDF" && d.Previous.FileType == "PDF" && len(d.ImageList) == len(d.Previous.ImageList) {
 			// Check if previous document has same page number... If so, let's create a double sided document in addtion to single side document...
 			// The User will choose later on which one he wants to keep.
-			err := d.SaveDoubleSidePDF()
-			if err != nil {
-				return err
-			}
+			err = d.SaveDoubleSidePDF()
+
+			d.Previous.CleanUp()
+			d.Previous = nil
+			d.CleanUp()
 		} else {
 			d.Previous.CleanUp()
 			d.Previous = nil
+			err = d.SaveSingleSide()
 		}
+	} else {
+		err = d.SaveSingleSide()
 	}
-
-	// If previous document still not cleaned, it's a good time to clean it
-	if d.Previous != nil {
-		_ = d.Previous.CleanUp()
-		d.Previous = nil
-	}
-	// In all case, current document is saved as single side
-	return d.SaveSingleSide()
+	return
 }
 
 func (d *Document) SaveSingleSide() (err error) {
@@ -217,6 +215,7 @@ func (d *Document) CleanUp() error {
 	if err != nil {
 		return DeviceError("Document", "CleanUp", err)
 	}
+	d.Clean = true
 	return err
 }
 

@@ -6,7 +6,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	//	"github.com/simulot/scantopc/sm"
 	"github.com/simulot/srvloc"
 	"io/ioutil"
 	"os"

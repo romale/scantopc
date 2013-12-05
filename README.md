@@ -41,19 +41,20 @@ This litle piece of code is my first programming experience with Go language and
 - Fails on Qnap arm system; somthing is wrong with PDF generation.
 
 # TODO: 
-- Fix Qnap problem
+- Fix Qnap problem (update: seems to by tied to QNAP and not ARM architecture. Need help here)
 - Manage several MFP on the network.
-- better error management
+- better error management (still in progress)
 
 # CHANGE LOG
-* 0.2.2
-	Fix: better error management 
-	Fix: better deconnection handling
-	Fix: reconnection error
-	Fix: PowerDown event handling
-	Code reorganisation: usage of event manager (again)
-	Change in double side handling: if the new scan job has same number of pages as previous one, both jobs are merged into one PDF
-	Changed Printer Event constant pulling by usage by using timout / etag.
+* 0.3
+	- Fix: better error management 
+	- Fix: better deconnection handling  
+	- Fix: reconnection error  
+	- Fix: PowerDown event handling  
+	- Code reorganisation: usage of event manager (again)  
+	- Change in double side handling: if the new scan job has same number of pages as previous one, both jobs are merged into one PDF  
+	- Changed Printer Event constant pulling by usage by using timout / etag.  
+	- Fix: better cleanup images in obvious cases
 	 
 * 0.2.1
 	Fix: Error when image takes to long

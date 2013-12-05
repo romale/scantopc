@@ -1,8 +1,14 @@
 package main
 
+import (
+//"encoding/xml"
+)
+
 type DestinationSettings struct {
+	//XMLName        xml.Name `xml:DestinationSettings"`
 	Name           string
 	FilePattern    *string
+	DoOCR          bool
 	SourceDocument map[string]map[string]ScanSettings // Per Source, per Format
 }
 
@@ -27,6 +33,7 @@ type ScanSettings struct {
 type MapOfDestinationSettings map[string]*DestinationSettings
 
 var DefaultDestinationSettings = MapOfDestinationSettings{
+
 	"Normal": &DestinationSettings{
 		Name:        "Normal",
 		FilePattern: &paramFolderPatern,

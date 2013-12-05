@@ -29,6 +29,6 @@ func ExampleParser() {
 	// 2009/2009.03/2009.03.10-15.53.10
 	// 2009\2009.03\2009.03.10-15.53.10
 	// Unknown token %W
-	// % can't be the last layout character
+	// % can't be the last layout's character
 
 }

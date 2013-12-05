@@ -314,6 +314,7 @@ func (d *Device) WalkupScanToCompEvent(Destination *Destination, HPWalkupScanToC
 
 	switch event.WalkupScanToCompEventType {
 	case "HostSelected": // That's for us...
+		INFO.Println("Scan job started")
 		if d.ScanBatch, err = NewScanBatch(d, Destination, d.ScanBatch); err != nil {
 			return err
 		}
@@ -336,6 +337,7 @@ func (d *Device) WalkupScanToCompEvent(Destination *Destination, HPWalkupScanToC
 			return DeviceError("Device.WalkupScanToCompEvent", "recieved ScanPagesComplete, but ScanBatch is nil", nil)
 		}
 		err = d.ScanBatch.ScanPagesComplete()
+		INFO.Println("Scan job ended")
 	default:
 		err = DeviceError("ScanEvent", "Unknown event"+event.WalkupScanToCompEventType, nil)
 	}
