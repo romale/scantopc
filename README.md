@@ -46,6 +46,8 @@ This litle piece of code is my first programming experience with Go language and
 - better error management (still in progress)
 
 # CHANGE LOG
+* 0.3.1
+	- Fix error management 
 * 0.3
 	- Fix: better error management 
 	- Fix: better deconnection handling  

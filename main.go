@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const VERSION = "0.3.0 DEV"
+const VERSION = "0.3.1 DEV"
 
 func CheckError(context string, err error) {
 	if err != nil {
