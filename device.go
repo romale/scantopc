@@ -147,13 +147,13 @@ func (d *Device) StartEventChannel() (chan bool, error) {
 		Etag = resp.Header.Get("Etag")
 		EventTable := new(HPEventTable)
 		ByteArray, _ := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
 		err = xml.Unmarshal(ByteArray, &EventTable)
 		if err != nil {
 			d.SetError(DeviceError("Device.StartEventChannel", "Unmarshal", err))
 			return
 		}
 
-		resp.Body.Close()
 		// Send firts events.
 		d.events <- *EventTable
 		for {
@@ -175,11 +175,13 @@ func (d *Device) StartEventChannel() (chan bool, error) {
 				switch resp.StatusCode {
 				case 304:
 					//NotChanged since last call
+					resp.Body.Close()
 				case 200:
 					// OK, there is a new event
 					Etag = resp.Header.Get("Etag")
 					TRACE.Println("Got Etag", Etag)
 					ByteArray, err := ioutil.ReadAll(resp.Body)
+					resp.Body.Close()
 					if err != nil {
 						d.SetError(DeviceError("Device.StartEventChannel.goroutine", "ReadAll", err))
 						return
@@ -260,11 +262,10 @@ func (d *Device) WalkupScanToCompEvent(Destination *Destination, HPWalkupScanToC
 		return DeviceError("Device.WalkupScanToCompEvent", "", err)
 	}
 
-	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
+		resp.Body.Close()
 		return DeviceError("Device.WalkupScanToCompEvent", "Unexpected Status "+resp.Status, err)
 	}
-	defer resp.Body.Close()
 
 	event := new(HPWalkupScanToCompEvent)
 	s, _ := ioutil.ReadAll(resp.Body)
@@ -314,7 +315,6 @@ func (d *Device) GetWalkupScanToCompDestinations(uri string) (*HPWalkupScanToCom
 	if err != nil {
 		return nil, DeviceError("Device.WalkupScanToCompDestinations", "", err)
 	}
-	resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		resp.Body.Close()
@@ -322,8 +322,8 @@ func (d *Device) GetWalkupScanToCompDestinations(uri string) (*HPWalkupScanToCom
 	}
 
 	s, err := ioutilReadAll(resp.Body)
+	resp.Body.Close()
 	if err != nil {
-		resp.Body.Close()
 		return nil, err
 	}
 	dest := new(HPWalkupScanToCompDestination)
@@ -342,11 +342,10 @@ func (d *Device) GetWalkupScanToCompDestinations(uri string) (*HPWalkupScanToCom
 	}
 
 	s, err = ioutilReadAll(resp.Body)
+	resp.Body.Close()
 	if err != nil {
-		resp.Body.Close()
 		return nil, err
 	}
-	resp.Body.Close()
 	dest = new(HPWalkupScanToCompDestination)
 	err = xml.Unmarshal(s, dest)
 	return dest, err
