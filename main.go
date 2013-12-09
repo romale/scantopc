@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const VERSION = "0.3.0 DEV"
+const VERSION = "0.3.1 DEV"
 
 func CheckError(context string, err error) {
 	if err != nil {
@@ -53,7 +53,7 @@ func init() {
 	flag.StringVar(&paramFolderPatern, "d", "", "shorthand for -destination")
 	flag.BoolVar(&paramDoubleSide, "D", true, "shorthand for -doubleside")
 	flag.BoolVar(&paramDoubleSide, "doubleside", true, "enable double side scanning with one side scannig")
-	//paramModeTrace = true
+	paramModeTrace = true
 
 }
 
