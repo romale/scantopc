@@ -13,17 +13,18 @@ import (
 )
 
 type Document struct {
-	t        time.Time // Used to determine document name
-	FileType string    // JPEG, PDF
-
-	TempDir   string   // Temporary folder for images
-	ImageList []string // List of scanned images
-	Previous  *Document
-	timeout   *time.Timer
-	Clean     bool
+	Destination    *Destination // Scan parameters
+	t              time.Time    // Used to determine document name
+	FileType       string       // JPEG, PDF
+	TempDir        string       // Temporary folder for images
+	ImageList      []string     // List of scanned images
+	Previous       *Document
+	timeout        *time.Timer
+	Clean          bool
+	ImageProcessor *ImageProcessor
 }
 
-func NewDocument(previous *Document) (*Document, error) {
+func NewDocument(Destination *Destination, previous *Document) (*Document, error) {
 	defer Un(Trace("Document.NewDocument"))
 
 	d := new(Document)
@@ -31,7 +32,7 @@ func NewDocument(previous *Document) (*Document, error) {
 	if err != nil {
 		return nil, DeviceError("Document", "NewDocument", err)
 	}
-
+	d.Destination = Destination
 	d.TempDir = t
 	d.t = time.Now()
 	if previous != nil {
@@ -41,7 +42,11 @@ func NewDocument(previous *Document) (*Document, error) {
 		}
 		d.Previous = previous
 	}
-
+	if Destination.DestinationSettings.DoOCR {
+		// The document will be OCRised.
+		d.ImageProcessor = NewImageProcessor()
+		err = os.Mkdir(d.TempDir+"/ocr", 0700)
+	}
 	return d, err
 }
 
@@ -64,7 +69,7 @@ func (d *Document) CheckFolder(filename string) error {
 	return nil
 }
 
-func (d *Document) NewImageWritter() (io.WriteCloser, error) {
+func (d *Document) newImageWritter() (io.WriteCloser, error) {
 	defer Un(Trace("Document.NewImageWritter"))
 
 	ImageName := d.TempDir + "/" + fmt.Sprintf("page-%04d.jpg", len(d.ImageList))
@@ -75,6 +80,21 @@ func (d *Document) NewImageWritter() (io.WriteCloser, error) {
 	d.ImageList = append(d.ImageList, ImageName)
 	TRACE.Println("Image will be saved in ", ImageName)
 	return out, err
+}
+
+func (d *Document) WriteImage(image io.ReadCloser, ImageHeight int) (err error) {
+	defer Un(Trace("Document.WriteImage"))
+
+	out, err := d.newImageWritter()
+	defer out.Close()
+	_, err = CopyAndFixJPEG(out, image, ImageHeight)
+	image.Close()
+	out.Close()
+	if d.Destination.DestinationSettings.DoOCR {
+		// Push image treatment into workers pool
+		d.ImageProcessor.PushJob(NewImageJob(d.ImageList[len(d.ImageList)-1]))
+	}
+	return
 }
 
 func (d *Document) Save() (err error) {
@@ -152,6 +172,23 @@ func (d *Document) SaveSingleSidePDF() error {
 }
 
 func (d *Document) SaveAsPDF(filename string, images []string) error {
+	if d.Destination.DestinationSettings.DoOCR {
+		return d.SaveAsPDFOCR(filename, images)
+	}
+	return d.SaveAsPDFwithFPDF(filename, images)
+}
+
+func (d *Document) SaveAsPDFOCR(filename string, images []string) error {
+	defer Un(Trace("Document.SaveAsPDFOCR", filename))
+
+	TRACE.Println("Document.SaveAsPDFOCR: Waiting ool of workers to finish")
+	d.ImageProcessor.WaitWorkersResults()
+	err := CreatePDFUsingPDFTK(filename, images)
+	err = CreateTextIndex(filename, images)
+	return err
+}
+
+func (d *Document) SaveAsPDFwithFPDF(filename string, images []string) error {
 	defer Un(Trace("Document.SaveAsPDF", filename))
 
 	err := d.CheckFolder(filename)

@@ -43,7 +43,7 @@ func (sb *ScanBatch) HostSelected() error {
 	if sb.Previous != nil {
 		PrevDoc = sb.Previous.Document
 	}
-	Document, err := NewDocument(PrevDoc)
+	Document, err := NewDocument(sb.Destination, PrevDoc)
 	sb.Document = Document
 	return err
 }
@@ -187,7 +187,7 @@ func (sb *ScanBatch) CheckScanJobSettings(source string, documenttype string) (S
 	var HPResolution *HPResolution
 
 	// Take max resolution from default settings
-	MaxResolution = sb.Destination.DestinationSettings.SourceDocument[source][documenttype].Resolution
+	MaxResolution = sb.Destination.DestinationSettings.ScanSettings.Resolution
 	if MaxResolution == 0 {
 		return nil, DeviceError("ScanBatch", "No scan settings for ["+source+","+documenttype+"]", nil)
 	}
@@ -214,7 +214,7 @@ func (sb *ScanBatch) CheckScanJobSettings(source string, documenttype string) (S
 		}
 	}
 
-	TRACE.Printf("Source %s, Format %s,\nSettings %+v\n", source, documenttype, sb.Destination.DestinationSettings.SourceDocument[source])
+	//TRACE.Printf("Source %s, Format %s,\nSettings %+v\n", source, documenttype, sb.Destination.DestinationSettings.ScanSettings)
 
 	// Create Setting structure for the ScanJob.
 	ScanSettings = &HPScanSettings{
@@ -225,20 +225,20 @@ func (sb *ScanBatch) CheckScanJobSettings(source string, documenttype string) (S
 		Width:              2481,
 		Height:             3507,
 		Format:             "Jpeg",
-		CompressionQFactor: sb.Destination.DestinationSettings.SourceDocument[source][documenttype].Compression,
-		ColorSpace:         sb.Destination.DestinationSettings.SourceDocument[source][documenttype].ColorSpace,
-		BitDepth:           sb.Destination.DestinationSettings.SourceDocument[source][documenttype].BitDepth,
+		CompressionQFactor: sb.Destination.DestinationSettings.ScanSettings.Compression,
+		ColorSpace:         sb.Destination.DestinationSettings.ScanSettings.ColorSpace,
+		BitDepth:           sb.Destination.DestinationSettings.ScanSettings.BitDepth,
 		InputSource:        source,
 		GrayRendering:      "NTSC",
-		Gamma:              sb.Destination.DestinationSettings.SourceDocument[source][documenttype].Gamma,
-		Brightness:         sb.Destination.DestinationSettings.SourceDocument[source][documenttype].Brightness,
-		Contrast:           sb.Destination.DestinationSettings.SourceDocument[source][documenttype].Contrast,
-		Highlite:           sb.Destination.DestinationSettings.SourceDocument[source][documenttype].Highlite,
-		Shadow:             sb.Destination.DestinationSettings.SourceDocument[source][documenttype].Shadow,
-		Threshold:          sb.Destination.DestinationSettings.SourceDocument[source][documenttype].Threshold,
-		SharpeningLevel:    sb.Destination.DestinationSettings.SourceDocument[source][documenttype].SharpeningLevel,
-		NoiseRemoval:       sb.Destination.DestinationSettings.SourceDocument[source][documenttype].NoiseRemoval,
-		ContentType:        sb.Destination.DestinationSettings.SourceDocument[source][documenttype].ContentType,
+		Gamma:              sb.Destination.DestinationSettings.ScanSettings.Gamma,
+		Brightness:         sb.Destination.DestinationSettings.ScanSettings.Brightness,
+		Contrast:           sb.Destination.DestinationSettings.ScanSettings.Contrast,
+		Highlite:           sb.Destination.DestinationSettings.ScanSettings.Highlite,
+		Shadow:             sb.Destination.DestinationSettings.ScanSettings.Shadow,
+		Threshold:          sb.Destination.DestinationSettings.ScanSettings.Threshold,
+		SharpeningLevel:    sb.Destination.DestinationSettings.ScanSettings.SharpeningLevel,
+		NoiseRemoval:       sb.Destination.DestinationSettings.ScanSettings.NoiseRemoval,
+		ContentType:        sb.Destination.DestinationSettings.ScanSettings.ContentType,
 	}
 	return ScanSettings, err
 }
@@ -295,13 +295,6 @@ func (sb *ScanBatch) ScanJobLoop(jobURL string) (err error) {
 func (sb *ScanBatch) DownloadImage(imageURL string, ImageHeight int) (err error) {
 	defer Un(Trace("ScanBatch.DownloadImage"))
 
-	out, err := sb.Document.NewImageWritter()
-	if err != nil {
-		return err
-	}
-
-	defer out.Close()
-
 	// Take image download link from job
 	uri := sb.d.URL + imageURL
 
@@ -314,14 +307,7 @@ func (sb *ScanBatch) DownloadImage(imageURL string, ImageHeight int) (err error)
 	if resp.StatusCode != 200 {
 		return DeviceError("ScanBatch.DownloadImage", "Unexpected status "+resp.Status, nil)
 	}
-
-	// Read HTML response, then fix the JPEG structure and save it into a file
-	_, err = CopyAndFixJPEG(out, resp.Body, ImageHeight)
-	if err != nil {
-		return DeviceError("ScanBatch.DownloadImage", "CopyAndFixJPEG", err)
-	}
-
-	out.Close()
+	err = sb.Document.WriteImage(resp.Body, ImageHeight)
 	sb.ResetTimeOut()
 	return nil
 }

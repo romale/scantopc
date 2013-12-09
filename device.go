@@ -20,6 +20,7 @@ type Device struct {
 	EventChan    chan HPEventTable
 	ScanBatch    *ScanBatch
 	AgingStamp   string
+	RegisterTime time.Time
 }
 
 type deviceError struct {
@@ -64,7 +65,7 @@ func NewDeviceManager(name, url string) (*Device, error) {
 
 func (d *Device) Start() (err error) {
 	defer Un(Trace("Device.Start"))
-	if err = d.Register(DefaultDestinationSettings); err == nil {
+	if err = d.Register(DefaultDestination); err == nil {
 		go d.StartEventChannel()
 		err = d.MainLoop()
 	}
@@ -98,11 +99,11 @@ func (d *Device) Register(settings MapOfDestinationSettings) (err error) {
 	// TODO: Is this call necessary?
 	resp, err := HttpGet(d.URL + "/DevMgmt/DiscoveryTree.xml")
 	if err != nil {
-		return DeviceError("Register", "DiscoveryTree", err)
+		return DeviceError("Device.Register", "DiscoveryTree", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return DeviceError("Register", "Unexpected Status "+resp.Status, err)
+		return DeviceError("Device.Register", "Unexpected Status "+resp.Status, err)
 	}
 
 	tree := new(HPDiscoveryTree)
@@ -112,14 +113,14 @@ func (d *Device) Register(settings MapOfDestinationSettings) (err error) {
 	}
 	resp.Body.Close()
 
+	// TODO: Is this call necessary?
 	resp, err = HttpGet(d.URL + "/WalkupScanToComp/WalkupScanToCompDestinations")
 	if err != nil {
-		return DeviceError("Register", "WalkupScanToCompDestinations", err)
+		return DeviceError("Device.Register", "WalkupScanToCompDestinations", err)
 	}
 	if resp.StatusCode != 200 {
-		return DeviceError("Register", "Unexpected Status "+resp.Status, err)
+		return DeviceError("Device.Register", "Unexpected Status "+resp.Status, err)
 	}
-
 	destinations := new(HPWalkupScanToCompDestinations)
 	s, err := ioutil.ReadAll(resp.Body)
 	CheckError("ReadBody", err)
@@ -128,6 +129,7 @@ func (d *Device) Register(settings MapOfDestinationSettings) (err error) {
 	}
 	resp.Body.Close()
 
+	// Register our destinations
 	for Name, DestinationSettings := range settings {
 		// Create Post stucture of register a destination
 		Me := &HPPostDestination{
@@ -143,11 +145,11 @@ func (d *Device) Register(settings MapOfDestinationSettings) (err error) {
 		r := bytes.NewBufferString(XMLHeader + string(ByteArray))
 
 		if resp, err = HttpPost(d.URL+"/WalkupScanToComp/WalkupScanToCompDestinations", "text/xml", r); err != nil {
-			return DeviceError("Register / Post WalkupScanToCompDestinations", "HTTP", err)
+			return DeviceError("Device.Register / Post WalkupScanToCompDestinations", "HTTP", err)
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != 201 {
-			return DeviceError("Register /  Post WalkupScanToCompDestinations", "Unexpected Status "+resp.Status, err)
+			return DeviceError("Device.Register /  Post WalkupScanToCompDestinations", "Unexpected Status "+resp.Status, err)
 		}
 
 		// SuccessFull registration
@@ -161,6 +163,7 @@ func (d *Device) Register(settings MapOfDestinationSettings) (err error) {
 			URI:                 uri,
 		}
 		INFO.Println("Registration successful:", Me.Hostname, uuid)
+		d.RegisterTime = time.Now()
 	}
 	return err
 }
@@ -212,13 +215,18 @@ func (d *Device) StartEventChannel() {
 
 	for err == nil {
 		headers["If-None-Match"] = Etag
-		resp, err := HttpGetWithTimeout(d.URL+"/EventMgmt/EventTable?timeout=1200", &headers, 2*time.Second, 150*time.Second)
+		resp, err := HttpGetWithTimeout(d.URL+"/EventMgmt/EventTable?timeout=1200", &headers, 2*time.Second, 200*time.Second)
 		if err != nil {
 			err = DeviceError("Device.StartEventChannel.goroutine", "GET", err)
 		} else {
 			switch resp.StatusCode {
 			case 304:
 				//NotChanged since last call
+				if time.Since(d.RegisterTime) > time.Duration(1*time.Hour) {
+					// Sleeping since long time.
+					// Lets refresh destinatations
+					d.Register(DefaultDestination)
+				}
 			case 200:
 				// OK, there is a new event
 				Etag = resp.Header.Get("Etag")
@@ -284,6 +292,9 @@ func (d *Device) ScanEvent(HPEvent HPEvent) (err error) {
 				return err
 			}
 		} else {
+			if time.Since(d.RegisterTime) > time.Duration(3*time.Minute) {
+				d.Register(DefaultDestination)
+			}
 			TRACE.Println("Device.ScanEvent uknown destination")
 		}
 		return err

@@ -6,10 +6,10 @@ import (
 
 type DestinationSettings struct {
 	//XMLName        xml.Name `xml:DestinationSettings"`
-	Name           string
-	FilePattern    *string
-	DoOCR          bool
-	SourceDocument map[string]map[string]ScanSettings // Per Source, per Format
+	Name         string
+	FilePattern  *string
+	DoOCR        bool
+	ScanSettings *ScanSettings
 }
 
 type ScanSettings struct {
@@ -27,159 +27,90 @@ type ScanSettings struct {
 	SharpeningLevel int    // 128,
 	NoiseRemoval    int    // 0,
 	ContentType     string // "Photo","Document"
+}
 
+var OCRScanSettings = ScanSettings{
+	Resolution:      200,
+	ColorSpace:      "Gray",
+	Compression:     0,
+	BitDepth:        8,
+	GrayRendering:   "NTSC",
+	Gamma:           1000,
+	Brightness:      1000,
+	Contrast:        1000,
+	Highlite:        179,
+	Shadow:          25,
+	Threshold:       0,
+	SharpeningLevel: 128,
+	NoiseRemoval:    0,
+	ContentType:     "Document",
+}
+
+var NormalScanSettings = ScanSettings{
+	Resolution:      200,
+	ColorSpace:      "Gray",
+	Compression:     15,
+	BitDepth:        8,
+	GrayRendering:   "NTSC",
+	Gamma:           1000,
+	Brightness:      1000,
+	Contrast:        1000,
+	Highlite:        179,
+	Shadow:          25,
+	Threshold:       0,
+	SharpeningLevel: 128,
+	NoiseRemoval:    0,
+	ContentType:     "Document",
+}
+
+var ColorScanSettings = ScanSettings{
+	Resolution:      200,
+	ColorSpace:      "Color",
+	Compression:     15,
+	BitDepth:        8,
+	GrayRendering:   "NTSC",
+	Gamma:           1000,
+	Brightness:      1000,
+	Contrast:        1000,
+	Highlite:        179,
+	Shadow:          25,
+	Threshold:       0,
+	SharpeningLevel: 128,
+	NoiseRemoval:    0,
+	ContentType:     "Photo",
 }
 
 type MapOfDestinationSettings map[string]*DestinationSettings
 
-var DefaultDestinationSettings = MapOfDestinationSettings{
-
+var DefaultDestination = MapOfDestinationSettings{
+	"OCR": &DestinationSettings{
+		Name:         "OCR",
+		FilePattern:  &paramFolderPatern,
+		DoOCR:        true,
+		ScanSettings: &OCRScanSettings,
+	},
 	"Normal": &DestinationSettings{
-		Name:        "Normal",
-		FilePattern: &paramFolderPatern,
-		SourceDocument: map[string]map[string]ScanSettings{
-			"Platen": map[string]ScanSettings{
-				"JPEG": ScanSettings{
-					Resolution:      200,
-					ColorSpace:      "Color",
-					Compression:     15,
-					BitDepth:        8,
-					GrayRendering:   "NTSC",
-					Gamma:           1000,
-					Brightness:      1000,
-					Contrast:        1000,
-					Highlite:        179,
-					Shadow:          25,
-					Threshold:       0,
-					SharpeningLevel: 128,
-					NoiseRemoval:    0,
-					ContentType:     "Photo",
-				},
-				"PDF": ScanSettings{
-					Resolution:      300,
-					ColorSpace:      "Gray",
-					Compression:     15,
-					BitDepth:        8,
-					GrayRendering:   "NTSC",
-					Gamma:           1000,
-					Brightness:      1000,
-					Contrast:        1000,
-					Highlite:        179,
-					Shadow:          25,
-					Threshold:       0,
-					SharpeningLevel: 128,
-					NoiseRemoval:    0,
-					ContentType:     "Document",
-				},
-			},
-			"Adf": map[string]ScanSettings{
-				"JPEG": ScanSettings{
-					Resolution:      200,
-					ColorSpace:      "Color",
-					Compression:     15,
-					BitDepth:        8,
-					GrayRendering:   "NTSC",
-					Gamma:           1000,
-					Brightness:      1000,
-					Contrast:        1000,
-					Highlite:        179,
-					Shadow:          25,
-					Threshold:       0,
-					SharpeningLevel: 128,
-					NoiseRemoval:    0,
-					ContentType:     "Photo",
-				},
-				"PDF": ScanSettings{
-					Resolution:      200,
-					ColorSpace:      "Gray",
-					Compression:     15,
-					BitDepth:        8,
-					GrayRendering:   "NTSC",
-					Gamma:           1000,
-					Brightness:      1000,
-					Contrast:        1000,
-					Highlite:        179,
-					Shadow:          25,
-					Threshold:       0,
-					SharpeningLevel: 128,
-					NoiseRemoval:    0,
-					ContentType:     "Document",
-				},
-			},
-		},
+		Name:         "Normal",
+		FilePattern:  &paramFolderPatern,
+		DoOCR:        true,
+		ScanSettings: &NormalScanSettings,
 	},
-	"LowRes": &DestinationSettings{
-		Name:        "LowRes",
-		FilePattern: &paramFolderPatern,
-		SourceDocument: map[string]map[string]ScanSettings{
-			"Platen": map[string]ScanSettings{
-				"JPEG": ScanSettings{
-					Resolution:      75,
-					ColorSpace:      "Color",
-					Compression:     15,
-					BitDepth:        8,
-					GrayRendering:   "NTSC",
-					Gamma:           1000,
-					Brightness:      1000,
-					Contrast:        1000,
-					Highlite:        179,
-					Shadow:          25,
-					Threshold:       0,
-					SharpeningLevel: 128,
-					NoiseRemoval:    0,
-					ContentType:     "Photo",
-				},
-				"PDF": ScanSettings{
-					Resolution:      75,
-					ColorSpace:      "Gray",
-					Compression:     15,
-					BitDepth:        8,
-					GrayRendering:   "NTSC",
-					Gamma:           1000,
-					Brightness:      1000,
-					Contrast:        1000,
-					Highlite:        179,
-					Shadow:          25,
-					Threshold:       0,
-					SharpeningLevel: 128,
-					NoiseRemoval:    0,
-					ContentType:     "Document",
-				},
-			},
-			"Adf": map[string]ScanSettings{
-				"JPEG": ScanSettings{
-					Resolution:      75,
-					ColorSpace:      "Color",
-					Compression:     15,
-					BitDepth:        8,
-					GrayRendering:   "NTSC",
-					Gamma:           1000,
-					Brightness:      1000,
-					Contrast:        1000,
-					Highlite:        179,
-					Shadow:          25,
-					Threshold:       0,
-					SharpeningLevel: 128,
-					NoiseRemoval:    0,
-					ContentType:     "Photo",
-				},
-				"PDF": ScanSettings{
-					Resolution:      75,
-					ColorSpace:      "Gray",
-					Compression:     15,
-					BitDepth:        8,
-					GrayRendering:   "NTSC",
-					Gamma:           1000,
-					Brightness:      1000,
-					Contrast:        1000,
-					Highlite:        179,
-					Shadow:          25,
-					Threshold:       0,
-					SharpeningLevel: 128,
-					NoiseRemoval:    0,
-					ContentType:     "Document",
-				},
-			},
-		},
+	"Color": &DestinationSettings{
+		Name:         "Color",
+		FilePattern:  &paramFolderPatern,
+		DoOCR:        true,
+		ScanSettings: &ColorScanSettings,
 	},
+}
+
+type OCRSettings struct {
+	UseScantailor bool
+	UseTesseract  bool
+	UseHocr2Pdf   bool
+}
+
+var DefaultOCRSettings = OCRSettings{
+	UseScantailor: true,
+	UseTesseract:  true,
+	UseHocr2Pdf:   true,
 }

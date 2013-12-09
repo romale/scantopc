@@ -53,7 +53,7 @@ func init() {
 	flag.StringVar(&paramFolderPatern, "d", "", "shorthand for -destination")
 	flag.BoolVar(&paramDoubleSide, "D", true, "shorthand for -doubleside")
 	flag.BoolVar(&paramDoubleSide, "doubleside", true, "enable double side scanning with one side scannig")
-	//paramModeTrace = true
+	paramModeTrace = true
 
 }
 
@@ -81,7 +81,10 @@ func main() {
 	if paramComputerName == "" {
 		paramComputerName, _ = os.Hostname()
 	}
-
+	if CheckOCRDependencies() {
+		ERROR.Println("One or many depencies are not found. Please check your setup")
+		os.Exit(1)
+	}
 	if paramFolderPatern == "" {
 		WARNING.Println("No destination given, assuming: -destination=./%Y%m%d-%H%M%S")
 		paramFolderPatern = "./%Y%m%d-%H%M%S"
