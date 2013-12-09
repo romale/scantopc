@@ -15,7 +15,7 @@ var (
 	WARNING *log.Logger
 	ERROR   *log.Logger
 
-	traceGoRoutines bool = true
+	traceGoRoutines bool = false
 )
 
 func logInit(
