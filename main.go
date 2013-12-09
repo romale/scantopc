@@ -53,7 +53,7 @@ func init() {
 	flag.StringVar(&paramFolderPatern, "d", "", "shorthand for -destination")
 	flag.BoolVar(&paramDoubleSide, "D", true, "shorthand for -doubleside")
 	flag.BoolVar(&paramDoubleSide, "doubleside", true, "enable double side scanning with one side scannig")
-	//paramModeTrace = true
+	paramModeTrace = true
 
 }
 
