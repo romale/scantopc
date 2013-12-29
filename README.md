@@ -38,15 +38,26 @@ Allowed tokens for dir / file name are:
 This litle piece of code is my first programming experience with Go language and my first coding experience since a decade.
 
 # Known problems
-- Fails on Qnap arm system; somthing is wrong with PDF generation.
+- On Qnap ARM TS119:  SGEFAULT with saving as PDF (update: seems to by tied to QNAP and not ARM architecture. Need help here)
 
 # TODO: 
-- Fix Qnap problem (update: seems to by tied to QNAP and not ARM architecture. Need help here)
+- Service mode: been able to run as a service in *nix world
 - Manage several MFP on the network.
 - better error management (still in progress)
 
 # CHANGE LOG
+* 0.4.0
+	- Code reorganisation
+		All HP relative code is now placed into a separate package. The package localize the scanner, handle scan jobs and provide Scan To Computer feature. It's now using a DocumentBatcher interface to comunicate whith rest of the code.
+	- Fix: Small delay after job termination before handling a new job
+	- Fix: SCANTOPC / ScanEvent goroutine not ended properly
+	- Change default resolution to 300 dpi. tesseract gives better results. 	
+
 * 0.3.1
+	- add posibility to use pdfunite. pdftool option can give tool to be used when joining PDF pages. Accepted values: pdftk and pdfunite
+	- add option to enable / disable OCR. External dependancies are checked only when OCR flag is true
+	- Changed double side mode: now, the destination called 'OCR verso' must be selected on the printer to merge previous job with this one
+	- Change deflaut destinations to OCR and OCR verso. The last is to indicate that the current job is the 2nd side of previous. Whenever  previous job can't be the recto side of the job, the job is considered as recto and not verso. 
 	- Fix error management 
 * 0.3
 	- Fix: better error management 
@@ -59,7 +70,7 @@ This litle piece of code is my first programming experience with Go language and
 	- Fix: better cleanup images in obvious cases
 	 
 * 0.2.1
-	Fix: Error when image takes to long
+	Fix: Error when image takes to long to be scanned (hi resolution)
 	Fix: Turn off TRACE mode by default 
 * 0.2
 	- Code reorganisation

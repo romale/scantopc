@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"runtime"
 	"time"
 )
@@ -17,6 +18,10 @@ var (
 
 	traceGoRoutines bool = false
 )
+
+func init() {
+	logInit(os.Stdout, os.Stdout, os.Stdout, os.Stderr)
+}
 
 func logInit(
 	traceHandle io.Writer,
@@ -33,10 +38,15 @@ func logInit(
 		"TRACE: ",
 		log.Ldate|log.Ltime|flagFile)
 
-	INFO = log.New(infoHandle,
-		"",
-		log.Ldate|log.Ltime|flagFile)
-
+	if paramModeTrace {
+		INFO = log.New(infoHandle,
+			"INFO: ",
+			log.Ldate|log.Ltime|flagFile)
+	} else {
+		INFO = log.New(infoHandle,
+			"",
+			log.Ldate|log.Ltime|flagFile)
+	}
 	WARNING = log.New(warningHandle,
 		"WARNING: ",
 		log.Ldate|log.Ltime|flagFile)
@@ -44,9 +54,11 @@ func logInit(
 	ERROR = log.New(errorHandle,
 		"ERROR: ",
 		log.Ldate|log.Ltime|flagFile)
+
 }
 
 func Trace(f string, v ...interface{}) string {
+
 	if traceGoRoutines {
 		TRACE.Println("GO Routines", runtime.NumGoroutine())
 	}

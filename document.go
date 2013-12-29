@@ -1,264 +1,265 @@
-// document.go
-
 package main
 
+/*
+	Implemente a batch of documents
+
+*/
+
 import (
-	"code.google.com/p/gofpdf"
 	"fmt"
+	"github.com/simulot/hpdevices"
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
 	"time"
 )
 
-type Document struct {
-	Destination    *Destination // Scan parameters
-	t              time.Time    // Used to determine document name
-	FileType       string       // JPEG, PDF
-	TempDir        string       // Temporary folder for images
-	ImageList      []string     // List of scanned images
-	Previous       *Document
-	timeout        *time.Timer
-	Clean          bool
-	ImageProcessor *ImageProcessor
+type DocumentError struct {
+	Operation string
+	Message   string
+	Err       error
 }
 
-func NewDocument(Destination *Destination, previous *Document) (*Document, error) {
-	defer Un(Trace("Document.NewDocument"))
+// Implement Error
+func (e DocumentError) Error() string {
+	if e.Err != nil {
+		return e.Operation + ": " + e.Message + ", " + e.Err.Error()
+	} else {
+		return e.Operation + ": " + e.Message
+	}
+}
 
-	d := new(Document)
-	t, err := ioutil.TempDir("", "scantopc")
+func NewDocumentError(operation, message string, err ...error) error {
+	e := DocumentError{operation, message, nil}
+	if len(err) > 0 {
+		e.Err = err[0]
+	}
+	fmt.Println("NewDocumentError ", e)
+	return e
+}
+
+type OCRBatchImageManager struct {
+	tempfolder    string
+	settings      *hpdevices.DestinationSettings
+	doctype       string
+	format        string
+	previousbatch *OCRBatchImageManager
+	imagelist     []*imageJob
+	imageJobChan  chan *imageJob
+	filename      string // Final document name
+	when          time.Time
+}
+
+func NewOCRBatchImageManager(doctype string, destination *hpdevices.DestinationSettings, format string, previousbatch hpdevices.DocumentBatchHandler) (bh hpdevices.DocumentBatchHandler, err error) {
+	bm := new(OCRBatchImageManager)
+
+	INFO.Println("New scan batch started:", destination.Name, doctype)
+
+	bm.settings = destination
+	bm.doctype = doctype
+	switch doctype {
+	case "Jpeg":
+		bm.format = ".jpg"
+	case "PDF":
+		bm.format = ".pdf"
+	default:
+		err = NewDocumentError("NewOCRBatchImageManager", "Unknown format "+format, nil)
+		return nil, err
+	}
+
+	bm.tempfolder, err = ioutil.TempDir("", "scantopc")
 	if err != nil {
-		return nil, DeviceError("Document", "NewDocument", err)
+		return nil, NewDocumentError("NewOCRBatchImageManager", "", err)
 	}
-	d.Destination = Destination
-	d.TempDir = t
-	d.t = time.Now()
-	if previous != nil {
-		if previous.Previous != nil {
-			previous.Previous.CleanUp()
-			previous.Previous = nil
+
+	TRACE.Println("Temp folder for this batch is", bm.tempfolder)
+	bm.when = time.Now()
+	if previousbatch != nil {
+		if bm.settings.Verso {
+			TRACE.Println("Verso batch and previous batch known")
 		}
-		d.Previous = previous
+		bm.previousbatch = previousbatch.(*OCRBatchImageManager)
 	}
-	if Destination.DestinationSettings.DoOCR {
-		// The document will be OCRised.
-		d.ImageProcessor = NewImageProcessor()
-		err = os.Mkdir(d.TempDir+"/ocr", 0700)
-	}
-	return d, err
+	bm.imagelist = make([]*imageJob, 0)
+	bm.imageJobChan = make(chan *imageJob)
+	return hpdevices.DocumentBatchHandler(bm), nil
 }
 
-func (d *Document) SetFileType(filetype string) error {
-	defer Un(Trace("Document.SetFileType"))
-	if filetype == "JPEG" || filetype == "PDF" {
-		d.FileType = filetype
-		return nil
-	}
-	return DeviceError("Document", "SetFileType : Unknown file type"+filetype, nil)
+func (bm *OCRBatchImageManager) NewImageWriter() (file io.WriteCloser, err error) {
+	ij, err := NewImageJob(bm.tempfolder+"/"+fmt.Sprintf("page-%04d.jpg", len(bm.imagelist)), bm.imageJobChan)
+	INFO.Println("Recieving page from scanner:", ij.filename)
+	bm.imagelist = append(bm.imagelist, ij)
+	return ij, nil
 }
 
-func (d *Document) CheckFolder(filename string) error {
-	defer Un(Trace("Document.CheckFolder"))
-	dir, _ := path.Split(filename)
-	if dir != "" {
-		err := os.MkdirAll(dir, filePERM)
-		return err
-	}
+func (bm *OCRBatchImageManager) CloseDocumentBatch() error {
+	TRACE.Println("Last page recieved")
+	// Put here code to generate final pdf
+	go bm.FinalizeDocumentBatch()
 	return nil
 }
 
-func (d *Document) newImageWritter() (io.WriteCloser, error) {
-	defer Un(Trace("Document.NewImageWritter"))
+func (bm *OCRBatchImageManager) FinalizeDocumentBatch() {
+	defer Un(Trace("OCRBatchImageManager.FinalizeDocumentBatch"))
+	// This code is placed in a go routine to allow starting a new scan job while finishing OCR
 
-	ImageName := d.TempDir + "/" + fmt.Sprintf("page-%04d.jpg", len(d.ImageList))
-	out, err := os.Create(ImageName)
-	if err != nil {
-		return nil, DeviceError("Document.NewImageWritter", "os.Create "+ImageName, err)
-	}
-	d.ImageList = append(d.ImageList, ImageName)
-	TRACE.Println("Image will be saved in ", ImageName)
-	return out, err
-}
-
-func (d *Document) WriteImage(image io.ReadCloser, ImageHeight int) (err error) {
-	defer Un(Trace("Document.WriteImage"))
-
-	out, err := d.newImageWritter()
-	defer out.Close()
-	_, err = CopyAndFixJPEG(out, image, ImageHeight)
-	image.Close()
-	out.Close()
-	if d.Destination.DestinationSettings.DoOCR {
-		// Push image treatment into workers pool
-		d.ImageProcessor.PushJob(NewImageJob(d.ImageList[len(d.ImageList)-1]))
-	}
-	return
-}
-
-func (d *Document) Save() (err error) {
-	defer Un(Trace("Document.Save"))
-
-	TRACE.Println("Document.Previous", d.Previous)
-
-	if d.Previous != nil && d.Previous.Clean == false {
-		if d.FileType == "PDF" && d.Previous.FileType == "PDF" && len(d.ImageList) == len(d.Previous.ImageList) {
-			// Check if previous document has same page number... If so, let's create a double sided document in addtion to single side document...
-			// The User will choose later on which one he wants to keep.
-			err = d.SaveDoubleSidePDF()
-
-			d.Previous.CleanUp()
-			d.Previous = nil
-			d.CleanUp()
+	// Wait for all image treatment finished
+	nbErr := 0
+	for i := 0; i < len(bm.imagelist); i++ {
+		TRACE.Println("OCRBatchImageManager.FinalizeDocumentBatch", "waiting image", i)
+		ij := <-bm.imageJobChan
+		if ij.err == nil {
+			TRACE.Println("Image", ij.filename, "is ready")
 		} else {
-			d.Previous.CleanUp()
-			d.Previous = nil
-			err = d.SaveSingleSide()
+			TRACE.Println("Image", ij.filename, "has failed with error", ij.err)
+			nbErr++
+		}
+	}
+	INFO.Println("Last treatment for batch is finished")
+	_ = nbErr
+	// At that point, all scanned images have been processed or are errored
+	if bm.previousbatch != nil {
+		prevBatch := bm.previousbatch
+		if bm.settings.Verso && len(prevBatch.imagelist) == len(bm.imagelist) {
+			newImageList := make([]*imageJob, 2*len(bm.imagelist))
+			for i := 0; i < len(bm.imagelist); i++ {
+				newImageList[2*i] = prevBatch.imagelist[i]
+				newImageList[2*i+1] = bm.imagelist[len(bm.imagelist)-i-1]
+			}
+			prevBatch.CombinePages(newImageList)
+			prevBatch.CleanUp()
+		} else {
+			prevBatch.CleanUp()
+			bm.CombinePages(bm.imagelist)
 		}
 	} else {
-		err = d.SaveSingleSide()
+		bm.CombinePages(bm.imagelist)
 	}
-	return
 }
 
-func (d *Document) SaveSingleSide() (err error) {
-	defer Un(Trace("Document.SaveSingleSide"))
+/*
+	Clean all temporary files created by the process in TMP folder
+*/
 
-	switch d.FileType {
-	case "PDF":
-		err = d.SaveSingleSidePDF()
-	case "JPEG":
-		err = d.SaveJPEG()
-	default:
-		err = DeviceError("Document", "SaveSingleSide: Unknown file type["+d.FileType+"]", nil)
+func (bm *OCRBatchImageManager) CleanUp() error {
+	return os.RemoveAll(bm.tempfolder)
+}
+
+/*
+	Clean up tempory folder and errase final file.
+	This is used when the previous image batch is combined with current
+
+*/
+
+func (bm *OCRBatchImageManager) Erase() error {
+	os.RemoveAll(bm.tempfolder)
+	return os.Remove(bm.filename)
+}
+
+func (bm *OCRBatchImageManager) CombinePages(imagelist []*imageJob) {
+	var err error
+	bm.filename, err = ExpandString(*bm.settings.FilePattern, bm.when)
+	if err != nil {
+		ERROR.Print("Name pattern is incorrect. Job discarded", err)
 	}
+	if err == nil {
+		bm.filename += bm.format
+		bm.CreatePDF(imagelist)
+	}
+}
+
+func (bm *OCRBatchImageManager) CreatePDF(imagelist []*imageJob) {
+	switch paramPFDTool {
+	case "pdfunite":
+		CreatePDFUsingPDFunite(bm.filename, imagelist)
+	case "pdftk":
+		CreatePDFUsingPDFTK(bm.filename, imagelist)
+	}
+}
+
+func CreatePDFUsingPDFTK(filename string, images []*imageJob) error {
+	argList := make([]string, 0)
+	for i := 0; i < len(images); i++ {
+		p := images[i]
+		d, f := path.Split(p.filename)
+		argList = append(argList, d+"ocr-"+f+".pdf")
+	}
+	arglist := append(argList, "cat", "output", filename)
+	cmd := exec.Command("pdftk", arglist...)
+	out, err := cmd.CombinedOutput()
+	fmt.Println("pdftk", filename, "processed\n", err, "\n", string(out))
 	return err
 }
 
-func (d *Document) SaveDoubleSidePDF() error {
-	defer Un(Trace("Document.SaveDoubleSide"))
-
-	fileName, err := ExpandString(paramFolderPatern, d.Previous.t)
-	if err != nil {
-		return DeviceError("Document", "SaveDoubleSide", err)
-	}
-	fileName += "-doubleside.pdf"
-	images := make([]string, 2*len(d.ImageList))
-	for p := 0; p < len(d.ImageList); p++ {
-		images[2*p] = d.Previous.ImageList[p]
-		images[2*p+1] = d.ImageList[len(d.ImageList)-p-1]
-	}
-	err = d.SaveAsPDF(fileName, images)
-	if err != nil {
+func CreatePDFUsingPDFunite(filename string, images []*imageJob) error {
+	if len(images) > 1 {
+		argList := make([]string, 0)
+		for i := 0; i < len(images); i++ {
+			p := images[i]
+			d, f := path.Split(p.filename)
+			argList = append(argList, d+"ocr-"+f+".pdf")
+		}
+		arglist := append(argList, filename)
+		cmd := exec.Command("pdfunite", arglist...)
+		out, err := cmd.CombinedOutput()
+		fmt.Println("pdfunite", filename, "processed\n", err, "\n", string(out))
 		return err
 	}
+	d, f := path.Split(images[0].filename)
+	_, err := CopyFile(d+"ocr-"+f+".pdf", filename)
 	return err
+
 }
 
-func (d *Document) SaveSingleSidePDF() error {
-	defer Un(Trace("Document.SaveSingleSidePDF"))
+/*
+Check if all dependencies are met
+*/
 
-	fileName, err := ExpandString(paramFolderPatern, d.t)
-	if err != nil {
-		return DeviceError("Document", "SaveSingleSidePDF", err)
-	}
-	fileName += ".pdf"
-	err = d.SaveAsPDF(fileName, d.ImageList)
-	if err != nil {
-		return err
-	}
-	return err
-}
-
-func (d *Document) SaveAsPDF(filename string, images []string) error {
-	if d.Destination.DestinationSettings.DoOCR {
-		return d.SaveAsPDFOCR(filename, images)
-	}
-	return d.SaveAsPDFwithFPDF(filename, images)
-}
-
-func (d *Document) SaveAsPDFOCR(filename string, images []string) error {
-	defer Un(Trace("Document.SaveAsPDFOCR", filename))
-
-	TRACE.Println("Document.SaveAsPDFOCR: Waiting ool of workers to finish")
-	d.ImageProcessor.WaitWorkersResults()
-	err := CreatePDFUsingPDFTK(filename, images)
-	err = CreateTextIndex(filename, images)
-	return err
-}
-
-func (d *Document) SaveAsPDFwithFPDF(filename string, images []string) error {
-	defer Un(Trace("Document.SaveAsPDF", filename))
-
-	err := d.CheckFolder(filename)
-	if err != nil {
-		return DeviceError("Document", "SaveAsPDF", err)
-	}
-
-	out, err := os.Create(filename)
-	if err != nil {
-		return DeviceError("Document", "SaveAsPDF", err)
-	}
-
-	defer out.Close()
-	pdf := gofpdf.New("P", "mm", "A4", "")
-	for _, page := range images {
-		TRACE.Println("\tAdd image", page)
-		pdf.AddPage()
-		pdf.Image(page, 0, 0, 210, 297, false, "", 0, "")
-	}
-
-	err = pdf.OutputAndClose(out)
-	if err != nil {
-		return DeviceError("Document", "SaveAsPDF", err)
-	}
-	INFO.Println("Document saved", filename)
-	return nil
-}
-
-func (d *Document) SaveJPEG() error {
-	defer Un(Trace("Document.SaveJPEG"))
-
-	fileName, err := ExpandString(paramFolderPatern, d.t)
-	err = d.CheckFolder(fileName)
-	if err != nil {
-		return DeviceError("Document", "SaveJPEG", err)
-	}
-
-	//prepare filname pattern for JPEGs
-	fileName, err = ExpandString(paramFolderPatern, d.t)
-	fileName += "-%04d.jpg"
-
-	for p, page := range d.ImageList {
-		dest := fmt.Sprintf(fileName, p)
-		_, err = CopyFile(page, dest)
+func CheckOCRDependencies() (r bool) {
+	r = false
+	if paramOCR {
+		path, err := exec.LookPath("convert")
+		TRACE.Println("convert", path, err)
 		if err != nil {
-			break
+			r = r || true
+			ERROR.Print("convert executable not found. Please check imagemagick installation.")
+		}
+		path, err = exec.LookPath("tesseract")
+		TRACE.Println("tesseract", path, err)
+		if err != nil {
+			r = r || true
+			ERROR.Print("tesseract executable not found. Please check tesseract installation.")
+		}
+		path, err = exec.LookPath("hocr2pdf")
+		TRACE.Println("hocr2pdf", path, err)
+		if err != nil {
+			r = r || true
+			ERROR.Print("hocr2pdf executable not found. Please check installation (http://www.exactcode.com/site/open_source/exactimage/hocr2pdf/).")
+		}
+		path1, err1 := exec.LookPath("pdftk")
+		TRACE.Println("pdftk", path1, err1)
+		path2, err2 := exec.LookPath("pdfunite")
+		TRACE.Println("pdfunite", path2, err1)
+		if err1 != nil && err2 != nil {
+			r = r || true
+			ERROR.Print("Neither pdftk or pdfunit (from poppler-utils package) executable are not found. Please check installation.")
+		}
+		if paramPFDTool == "" && err2 == nil {
+			paramPFDTool = "pdfunite"
+			INFO.Println("PDF tool to be used", path2)
+		}
+		if paramPFDTool == "" && err1 == nil {
+			paramPFDTool = "pdftk"
+			INFO.Println("PDF tool to be used", path1)
 		}
 	}
-
-	if err != nil {
-		return DeviceError("Document", "SaveJPEG", err)
-	}
-
-	err = d.CleanUp()
-	return err
-}
-
-func (d *Document) CleanUp() error {
-	defer Un(Trace("Document.CleanUp"))
-	err := os.RemoveAll(d.TempDir)
-	if err != nil {
-		return DeviceError("Document", "CleanUp", err)
-	}
-	d.Clean = true
-	return err
+	return r
 }
 
 // Utility
 func CopyFile(src, dst string) (int64, error) {
-	defer Un(Trace("CopyFile", src, dst))
 	sf, err := os.Open(src)
 	defer sf.Close()
 	if err != nil {

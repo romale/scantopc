@@ -6,14 +6,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/simulot/srvloc"
+	"github.com/simulot/hpdevices"
 	"io/ioutil"
 	"os"
 	"strings"
 	"time"
 )
 
-const VERSION = "0.3.1 DEV"
+const VERSION = "0.4.0 DEV"
 
 func CheckError(context string, err error) {
 	if err != nil {
@@ -43,7 +43,17 @@ var (
 	paramPrinterURL   string
 	paramFolderPatern string
 	paramDoubleSide   bool
+	paramOCR          bool
+	paramPFDTool      string
 )
+
+func main() {
+	banner()
+	GetParameters()
+	MainLoop()
+	INFO.Println(os.Args[0], "stopped")
+
+}
 
 func init() {
 	flag.BoolVar(&paramModeTrace, "trace", false, "Enable traces")
@@ -53,14 +63,14 @@ func init() {
 	flag.StringVar(&paramFolderPatern, "d", "", "shorthand for -destination")
 	flag.BoolVar(&paramDoubleSide, "D", true, "shorthand for -doubleside")
 	flag.BoolVar(&paramDoubleSide, "doubleside", true, "enable double side scanning with one side scannig")
+	flag.StringVar(&paramPFDTool, "pdftool", "", "precise which tool to be used when joining pages (supported: pdftk,pdfunite)")
+	flag.BoolVar(&paramOCR, "ocr", true, "enable/disable OCR functionality")
 	//paramModeTrace = true
 
 }
 
 func usage() {
-	// Fprintf allows us to print to a specifed file handle or stream
 	fmt.Fprintf(os.Stderr, "\nUsage of %s:\n", os.Args[0])
-	// PrintDefaults() may not be exactly what we want, but it could be
 	flag.PrintDefaults()
 	fmt.Println("\nExemple:")
 	fmt.Println("\t", os.Args[0], "-destination ~/Documents/%Y/%Y.%m/%Y.%m.%d-%H.%M.%S")
@@ -70,7 +80,11 @@ func usage() {
 	os.Exit(1)
 }
 
-func main() {
+func banner() {
+	INFO.Println(os.Args[0], "version", VERSION, "started")
+}
+
+func GetParameters() {
 	flag.Parse()
 	if !paramModeTrace {
 		logInit(ioutil.Discard, os.Stdout, os.Stdout, os.Stderr)
@@ -78,12 +92,9 @@ func main() {
 		logInit(os.Stdout, os.Stdout, os.Stdout, os.Stderr)
 		TRACE.Println("Trace enabled")
 	}
+	hpdevices.InitLogger(TRACE, INFO, WARNING, ERROR)
 	if paramComputerName == "" {
 		paramComputerName, _ = os.Hostname()
-	}
-	if CheckOCRDependencies() {
-		ERROR.Println("One or many depencies are not found. Please check your setup")
-		os.Exit(1)
 	}
 	if paramFolderPatern == "" {
 		WARNING.Println("No destination given, assuming: -destination=./%Y%m%d-%H%M%S")
@@ -97,11 +108,10 @@ func main() {
 		}
 		TRACE.Println("Save to ", s)
 	}
-
-	INFO.Println(os.Args[0], "version", VERSION, "started")
-	MainLoop()
-	INFO.Println(os.Args[0], "stopped")
-
+	if CheckOCRDependencies() {
+		ERROR.Println("One or many depencies are not found. Please check your setup")
+		usage()
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -110,25 +120,47 @@ func MainLoop() {
 	defer Un(Trace("MainLoop"))
 
 	for {
-		printer := paramPrinterURL
-		if printer == "" {
-			INFO.Println("Searching printer on the network")
-			device, err := srvloc.ProbeHPPrinter()
-			TRACE.Printf("%+v\n", device)
-			if err == nil {
-				// We have one
-				printer = fmt.Sprintf("http://%s:8080", device.IPAddress)
-			} else {
-				ERROR.Println("Device not found", err)
+		var (
+			Scanner *hpdevices.HPDevice
+			err     error
+		)
+
+		if paramPrinterURL == "" {
+			TRACE.Println("Searching printer on the network")
+			Scanner, err = hpdevices.LocalizeDevice()
+		} else {
+			TRACE.Println("Connection to the printer")
+			Scanner, err = hpdevices.NewHPDevice(paramPrinterURL)
+		}
+		if err != nil {
+			ERROR.Println(err)
+		}
+		time.Sleep(time.Second * 5)
+		if err == nil {
+			INFO.Println("Found device at", Scanner.URL)
+			d := []hpdevices.DestinationSettings{
+				hpdevices.DestinationSettings{
+					Name:        "OCR",
+					FilePattern: &paramFolderPatern,
+					DoOCR:       true,
+					Verso:       false,
+					Resolution:  300,
+					ColorSpace:  "Gray",
+				},
+				hpdevices.DestinationSettings{
+					Name:        "OCR (Verso)",
+					FilePattern: &paramFolderPatern,
+					DoOCR:       true,
+					Verso:       true,
+					Resolution:  300,
+					ColorSpace:  "Gray",
+				},
+			}
+
+			_, err := hpdevices.NewScanToPC(Scanner, NewOCRBatchImageManager, paramComputerName, d)
+			if err != nil {
+				ERROR.Println(err)
 			}
 		}
-
-		if printer != "" {
-			INFO.Println("Connecting to", printer)
-			NewDeviceManager(printer, printer)
-		}
-		INFO.Println("Connection to ", printer, "lost.")
-		printer = ""
-		time.Sleep(time.Second * 5)
 	}
 }
