@@ -47,8 +47,9 @@ This litle piece of code is my first programming experience with Go language and
 
 # CHANGE LOG
 * 0.4.0
+	- Fix "not responding" issue after disconection
 	- Code reorganisation
-		All HP relative code is now placed into a separate package. The package localize the scanner, handle scan jobs and provide Scan To Computer feature. It's now using a DocumentBatcher interface to comunicate whith rest of the code.
+		All HP relative code is now placed into a separate package HPDevices. This package localizes the scanner, handles scan jobs and provide Scan To Computer feature. It's now using a DocumentBatcher interface to comunicate whith rest of the code.
 	- Fix: Small delay after job termination before handling a new job
 	- Fix: SCANTOPC / ScanEvent goroutine not ended properly
 	- Change default resolution to 300 dpi. tesseract gives better results. 	
