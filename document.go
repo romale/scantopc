@@ -144,7 +144,12 @@ func (bm *OCRBatchImageManager) FinalizeDocumentBatch() {
 */
 
 func (bm *OCRBatchImageManager) CleanUp() error {
-	return os.RemoveAll(bm.tempfolder)
+	TRACE.Println("OCRBatchImageManager.CleanUp", bm.tempfolder)
+	err := os.RemoveAll(bm.tempfolder)
+	if err != nil {
+		ERROR.Println("OCRBatchImageManager.CleanUp", err)
+	}
+	return err
 }
 
 /*
@@ -230,18 +235,18 @@ func CheckOCRDependencies() (r bool) {
 		TRACE.Println("tesseract", path, err)
 		if err != nil {
 			r = r || true
-			ERROR.Print("tesseract executable not found. Please check tesseract installation.")
+			ERROR.Print("tesseract executable not found. (Installation packages tesseract-ocr and desired languages)")
 		}
 		path, err = exec.LookPath("hocr2pdf")
 		TRACE.Println("hocr2pdf", path, err)
 		if err != nil {
 			r = r || true
-			ERROR.Print("hocr2pdf executable not found. Please check installation (http://www.exactcode.com/site/open_source/exactimage/hocr2pdf/).")
+			ERROR.Print("hocr2pdf executable not found. (Installation package exactimage).")
 		}
 		path1, err1 := exec.LookPath("pdftk")
 		TRACE.Println("pdftk", path1, err1)
 		path2, err2 := exec.LookPath("pdfunite")
-		TRACE.Println("pdfunite", path2, err1)
+		TRACE.Println("pdfunite", path2, err2)
 		if err1 != nil && err2 != nil {
 			r = r || true
 			ERROR.Print("Neither pdftk or pdfunit (from poppler-utils package) executable are not found. Please check installation.")

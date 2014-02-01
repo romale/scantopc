@@ -4,9 +4,13 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
+	"os/user"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -17,10 +21,54 @@ var (
 	ERROR   *log.Logger
 
 	traceGoRoutines bool = false
+	logFile         *os.File
+)
+var (
+	pid      = os.Getpid()
+	program  = filepath.Base(os.Args[0])
+	host     = "unknownhost"
+	userName = "unknownuser"
 )
 
+//Provide Log at the very begining of execution
 func init() {
+	h, err := os.Hostname()
+	if err == nil {
+		host = h
+	}
+
+	current, err := user.Current()
+	if err == nil {
+		userName = current.Username
+	}
+
+	// Sanitize userName since it may contain filepath separators on Windows.
+	userName = strings.Replace(userName, `\`, "_", -1)
+
 	logInit(os.Stdout, os.Stdout, os.Stdout, os.Stderr)
+}
+
+func LogBanner() {
+	INFO.Println("Starting\n\tProgram:", program, "\n\tPID:", pid, "\n\tHost:", host, "\n\tUser:", userName)
+}
+
+func InitLogFiles() {
+	var err error
+	logFile, err = os.Create("/var/log/scantopc.log")
+	if err != nil {
+		fmt.Println(err)
+		logFile, err = os.Create(os.TempDir() + "/scantopc.log")
+		if err != nil {
+			panic(err)
+		}
+	}
+	if !paramModeTrace {
+		logInit(ioutil.Discard, logFile, logFile, logFile)
+	} else {
+		logInit(logFile, logFile, logFile, logFile)
+		TRACE.Println("Trace enabled")
+	}
+	LogBanner()
 }
 
 func logInit(

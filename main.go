@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/simulot/hpdevices"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -48,7 +47,6 @@ var (
 )
 
 func main() {
-	banner()
 	GetParameters()
 	MainLoop()
 	INFO.Println(os.Args[0], "stopped")
@@ -61,8 +59,6 @@ func init() {
 	flag.StringVar(&paramPrinterURL, "printer", "", "Printer URL like http://1.2.3.4:8080, when omitted, the device is searched on the network")
 	flag.StringVar(&paramFolderPatern, "destination", "", "Folder where images are strored (see help for tokens)")
 	flag.StringVar(&paramFolderPatern, "d", "", "shorthand for -destination")
-	flag.BoolVar(&paramDoubleSide, "D", true, "shorthand for -doubleside")
-	flag.BoolVar(&paramDoubleSide, "doubleside", true, "enable double side scanning with one side scannig")
 	flag.StringVar(&paramPFDTool, "pdftool", "", "precise which tool to be used when joining pages (supported: pdftk,pdfunite)")
 	flag.BoolVar(&paramOCR, "ocr", true, "enable/disable OCR functionality")
 	//paramModeTrace = true
@@ -86,13 +82,10 @@ func banner() {
 
 func GetParameters() {
 	flag.Parse()
-	if !paramModeTrace {
-		logInit(ioutil.Discard, os.Stdout, os.Stdout, os.Stderr)
-	} else {
-		logInit(os.Stdout, os.Stdout, os.Stdout, os.Stderr)
-		TRACE.Println("Trace enabled")
-	}
+	InitLogFiles()
 	hpdevices.InitLogger(TRACE, INFO, WARNING, ERROR)
+	banner()
+
 	if paramComputerName == "" {
 		paramComputerName, _ = os.Hostname()
 	}

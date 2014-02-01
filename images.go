@@ -132,3 +132,5 @@ func TimeOutCombinedOutput(to time.Duration, cmd *exec.Cmd) (out []byte, err err
 	close(done)
 	return
 }
+
+//   Reformatted by   jeanf    samedi 4 janvier 2014, 19:08:31 (UTC+0100)

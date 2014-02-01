@@ -6,13 +6,10 @@ This program provides the "ScanToComputer" functionality given by HP for they mu
 Place your document on the platen or in the automatic document feeder (Adf). Select Scan on printer display, then select a computer (a destination) and file format (PDF or JPEG).
 
 Double side scanning with single side ADF: 
-Place your original pile of document in the ADF, scan it. This will produice a pdf file.
-Flip them and scan it again. This will produce a second pdf file. If the second one has same page number as previous one, both are merged into a document having same name as firts job, will "-doubleside" into the name.
-
-
+Place your original pile of document in the ADF, scan it. This will produce a pdf file.
+Flip it and chose destination having Verso. This will produce a doublesided pdf file if the 2nd batch have same pange number.
 
 Tested with printer model Officejet 6700 on linux, freebsd.
-
 
 Usage of ./scantopc:  
 >   -d="": shorthand for -destination  
@@ -46,10 +43,12 @@ This litle piece of code is my first programming experience with Go language and
 - better error management (still in progress)
 
 # CHANGE LOG
+* 0.4.1
+	- Fix AgingStamp issue
 * 0.4.0
 	- Fix "not responding" issue after disconection
 	- Code reorganisation
-		All HP relative code is now placed into a separate package HPDevices. This package localizes the scanner, handles scan jobs and provide Scan To Computer feature. It's now using a DocumentBatcher interface to comunicate whith rest of the code.
+		All HP relative code is now placed into a separate package HPDevices. This package localizes the scanner, handles scan jobs and provide Scan To Computer feature. It's now using a DocumentBatcher interface to comunicate whith rest of the code. This decouples document creation from image acquisition.
 	- Fix: Small delay after job termination before handling a new job
 	- Fix: SCANTOPC / ScanEvent goroutine not ended properly
 	- Change default resolution to 300 dpi. tesseract gives better results. 	
